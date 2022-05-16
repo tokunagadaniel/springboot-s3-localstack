@@ -1,0 +1,60 @@
+version: "3"
+services:
+  localstack:
+    image: localstack/localstack
+    ports:
+      - '4566:4566'
+    environment:
+      - DEFAULT_REGION=us-east-1
+      - SERVICES=s3
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  aws_cli:
+    image: amazon/aws-cli
+    depends_on: 
+      - localstack
+    entrypoint: /bin/sh -c
+    command: >  
+     '
+     RED="\033[0;31m"
+     GREEN="\033[0;32m"
+     ACCESS_KEY="default"
+     SECRET_KEY="default"
+     REGION="us-east-1"
+     COUNTER=15;
+     S3_DESIRED_STATE="s3 available";
+     SERVICE_ACTUAL_STATE=0;
+     
+      while [ $$COUNTER -ne 0 ] && [ $$SERVICE_ACTUAL_STATE != 1 ]
+      
+      do 
+      RESPONSE=$$(curl -sb --connect-timeout 2 /dev/null "localstack:4566/health?redirect" | tr -cd [^[:alnum:][:space:]]+) 
+      echo " Response from Localstack $$RESPONSE";
+
+      if [[ $$RESPONSE == *"$$S3_DESIRED_STATE"* ]]; then SERVICE_ACTUAL_STATE=1; else SERVICE_ACTUAL_STATE=0; fi;
+     
+      COUNTER=$$((COUNTER-1)); 
+      echo "Service is not ready yet! $$COUNTER retries left."; 
+      sleep 3; 
+      done; 
+      echo backend is up;
+
+      echo "########### Creating profile ###########"
+
+      aws configure set aws_access_key_id $$ACCESS_KEY --profile=localstack
+      aws configure set aws_secret_access_key $$SECRET_KEY --profile=localstack      
+      aws configure set region $$REGION --profile=localstack
+
+      echo "########### Listing profile ###########"
+      aws configure list --profile=localstack
+
+      echo "########### Creating S3 ###########"
+      
+      aws s3api --profile localstack --endpoint-url=http://localstack:4566 create-bucket --bucket mybucket
+      
+      aws s3api --profile localstack --endpoint-url=http://localstack:4566 put-bucket-acl --bucket mybucket --acl public-read 
+      
+      echo -e "$${GREEN}########### [Success] S3 created ###########"
+      
+      '
