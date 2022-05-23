@@ -57,7 +57,7 @@ services:
       
       aws s3api --profile localstack --endpoint-url=http://localstack:4566 put-object --bucket mybucket --key data/
 
-      aws s3 --profile localstack --endpoint-url=http://localstack:4566 cp /test.txt s3://mybucket/data/
+      aws s3 --profile localstack --endpoint-url=http://localstack:4566 cp test.txt s3://mybucket/data/
       
       echo -e "$${GREEN}########### [Success] S3 created ###########"
       
